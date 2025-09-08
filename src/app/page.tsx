@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiSearch, FiUpload, FiBriefcase, FiMapPin, FiDollarSign, FiClock, FiFilter } from 'react-icons/fi';
@@ -32,13 +32,19 @@ export default function JobSearchApp() {
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 15;
   const [loadingJobs, setLoadingJobs] = useState(false);
-  const [loadingCV, setLoadingCV] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [parsedCV, setParsedCV] = useState<any>(null);
   const [jobScore, setJobScore] = useState<{ score: number; reason: string } | null>(null);
   const [isScoring, setIsScoring] = useState(false);
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'parsing' | 'success'>('idle');
+  const uploadStateRef = useRef(uploadState);
+  
+  // Keep the ref in sync with state
+  useEffect(() => {
+    uploadStateRef.current = uploadState;
+  }, [uploadState]);
 
   const handleSearch = async () => {
     if (!jobTitle.trim()) return;
@@ -114,14 +120,74 @@ export default function JobSearchApp() {
     formData.append('file', file);
 
     try {
-      setLoadingCV(true);
+      setUploadState('uploading');
       setError(null);
+      
+      // Simulate upload time
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setUploadState('parsing');
       const response = await axios.post('/api/upload-resume', formData);
+      
+      // Simulate parsing time
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
       setParsedCV(response.data);
+      setUploadState('success');
+      
+      // After 5 seconds, switch to update state if still in success state
+      const timer = setTimeout(() => {
+        if (uploadStateRef.current === 'success') {
+          setUploadState('idle');
+        }
+      }, 5000);
+      
+      // Clean up timer if component unmounts or upload happens again
+      return () => clearTimeout(timer);
     } catch (err) {
       setError('Failed to upload and parse CV.');
-    } finally {
-      setLoadingCV(false);
+      setUploadState('idle');
+    }
+  };
+
+  const getUploadButtonContent = () => {
+    switch (uploadState) {
+      case 'uploading':
+        return (
+          <div className="flex items-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Uploading...
+          </div>
+        );
+      case 'parsing':
+        return (
+          <div className="flex items-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Analyzing CV...
+          </div>
+        );
+      case 'success':
+        return (
+          <div className="flex items-center">
+            <svg className="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+            CV Ready!
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center">
+            <FiUpload className="mr-2" />
+            {parsedCV ? 'Update CV' : 'Upload CV'}
+          </div>
+        );
     }
   };
 
@@ -140,20 +206,45 @@ export default function JobSearchApp() {
                   <FiMapPin className="mr-2" />
                   Location
                 </button>
-                <button 
-                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                  onClick={() => document.getElementById('cv-upload')?.click()}
+                <motion.div 
+                  className="relative"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <FiUpload className="mr-2" />
-                  {parsedCV ? 'Update CV' : 'Upload CV'}
+                  <motion.button 
+                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      uploadState === 'success' 
+                        ? 'bg-green-100 text-green-700' 
+                        : parsedCV && uploadState === 'idle'
+                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                        : uploadState === 'uploading' || uploadState === 'parsing'
+                        ? 'bg-blue-600 text-white cursor-wait'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => document.getElementById('cv-upload')?.click()}
+                    disabled={uploadState === 'uploading' || uploadState === 'parsing'}
+                  >
+                    {getUploadButtonContent()}
+                  </motion.button>
                   <input
                     id="cv-upload"
                     type="file"
                     accept=".pdf,.doc,.docx"
                     onChange={handleUpload}
                     className="hidden"
+                    disabled={uploadState === 'uploading' || uploadState === 'parsing'}
                   />
-                </button>
+                  {uploadState === 'success' && (
+                    <motion.div 
+                      className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    >
+                      ✓
+                    </motion.div>
+                  )}
+                </motion.div>
               </div>
             </div>
 
@@ -456,31 +547,31 @@ export default function JobSearchApp() {
                 {/* Left Side - Job Description */}
                 <div className="flex-1 p-6 overflow-y-auto">
                   <div className="prose max-w-none">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Job Description</h3>
-                    <div className="text-gray-700 whitespace-pre-line text-sm leading-relaxed">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Description</h3>
+                    <div className="text-gray-800 whitespace-pre-line text-sm leading-relaxed text-justify">
                       {selectedJob.description}
                     </div>
                     
                     {(selectedJob.contract_time || selectedJob.category) && (
                       <div className="mt-6">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Job Details</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Job Details</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                           {selectedJob.contract_time && (
                             <div>
-                              <p className="text-gray-500">Contract Type</p>
-                              <p className="font-medium capitalize">{selectedJob.contract_time.replace('_', ' ')}</p>
+                              <p className="text-gray-700 font-semibold">Contract Type</p>
+                              <p className="font-medium text-gray-900 capitalize">{selectedJob.contract_time.replace('_', ' ')}</p>
                             </div>
                           )}
                           {selectedJob.category && (
                             <div>
-                              <p className="text-gray-500">Category</p>
-                              <p className="font-medium">{selectedJob.category.label}</p>
+                              <p className="text-gray-700 font-semibold">Category</p>
+                              <p className="font-medium text-gray-900">{selectedJob.category.label}</p>
                             </div>
                           )}
                           {selectedJob.created && (
                             <div>
-                              <p className="text-gray-500">Posted</p>
-                              <p className="font-medium">{new Date(selectedJob.created).toLocaleDateString()}</p>
+                              <p className="text-gray-700 font-semibold">Posted</p>
+                              <p className="font-medium text-gray-900">{new Date(selectedJob.created).toLocaleDateString()}</p>
                             </div>
                           )}
                         </div>
