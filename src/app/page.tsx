@@ -261,40 +261,88 @@ export default function JobSearchApp() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="bg-white rounded-lg max-w-6xl w-full p-6 shadow-2xl relative overflow-y-auto max-h-[90vh] flex"
+              className="bg-white rounded-lg max-w-6xl w-full p-0 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] mx-4 my-8"
             >
-              <button
-                onClick={() => setSelectedJob(null)}
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold"
-              >
-                &times;
-              </button>
-
-              {/* Left Side - Job Description */}
-              <div className="w-2/3 pr-6">
-                <h2 className="text-2xl font-bold mb-2">{selectedJob.title}</h2>
-                <p className="text-gray-600 mb-1">
-                  <strong>Company:</strong> {selectedJob.company.display_name}
-                </p>
-                <p className="text-gray-600 mb-4">
-                  <strong>Location:</strong> {selectedJob.location.display_name}
-                </p>
-                <p className="text-sm text-gray-800 whitespace-pre-line mb-4">
-                  {selectedJob.description}
-                </p>
-                <a
-                  href={selectedJob.redirect_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                >
-                  View Job Posting
-                </a>
+              {/* Header with gradient */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-1">{selectedJob.title}</h2>
+                    <p className="text-blue-100">{selectedJob.company.display_name}</p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedJob(null)}
+                    className="text-white hover:text-gray-200 text-2xl font-bold"
+                  >
+                    &times;
+                  </button>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-4 text-sm">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {selectedJob.location.display_name}
+                  </div>
+                  {selectedJob.salary_min && (
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {selectedJob.salary_min.toLocaleString()} {selectedJob.salary_currency || 'EUR'}
+                      {selectedJob.salary_max && ` - ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_currency || 'EUR'}`}
+                    </div>
+                  )}
+                  <a
+                    href={selectedJob.redirect_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Apply Now
+                  </a>
+                </div>
               </div>
+              {/* Content area with scroll */}
+              <div className="flex flex-1 overflow-hidden flex-col md:flex-row h-[calc(100%-180px)]">
+                {/* Left Side - Job Description */}
+                <div className="w-full md:w-2/3 p-4 md:p-6 overflow-y-auto">
+                  <div className="prose max-w-none">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Job Description</h3>
+                    <div className="text-gray-700 whitespace-pre-line text-sm leading-relaxed">
+                      {selectedJob.description}
+                    </div>
+                    
+                    {selectedJob.contract_time && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Job Details</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-500">Contract Type</p>
+                            <p className="font-medium">{selectedJob.contract_time}</p>
+                          </div>
+                          {selectedJob.category && (
+                            <div>
+                              <p className="text-gray-500">Category</p>
+                              <p className="font-medium">{selectedJob.category.label}</p>
+                            </div>
+                          )}
+                          {selectedJob.created && (
+                            <div>
+                              <p className="text-gray-500">Posted</p>
+                              <p className="font-medium">{new Date(selectedJob.created).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-              {/* Right Side - Match Score */}
-              <div className="w-1/3 pl-6 border-l border-gray-200">
-                <div className="w-90 flex flex-col items-start">
+                {/* Right Side - Match Score */}
+              <div className="w-full md:w-1/3 p-4 md:p-6 bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto overflow-x-hidden h-full">
+                <div className="w-full flex flex-col h-full">
                   {isScoring ? (
                     // Skeleton loading state
                     <div className="w-full">
@@ -321,20 +369,21 @@ export default function JobSearchApp() {
                           {jobScore.score}/100
                         </span>
                       </div>
-                      <div className="bg-gray-50 p-4 border rounded text-sm text-gray-800 whitespace-pre-wrap w-full">
+                      <div className="bg-white p-4 border rounded text-sm text-gray-800 whitespace-pre-wrap w-full break-words">
                         <strong>Why:</strong>
                         <p className="mt-2">{jobScore.reason}</p>
                       </div>
                     </>
                   ) : (
                     // Empty state when no CV is uploaded
-                    <div className="text-center w-full text-gray-500 p-4">
+                    <div className="text-center w-full text-gray-500 p-4 h-full flex items-center justify-center">
                       <p>Upload your CV to see your match score</p>
                     </div>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
+          </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
