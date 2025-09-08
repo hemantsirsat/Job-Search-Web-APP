@@ -3,19 +3,40 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Job } from './types';
+import { FiSearch, FiUpload, FiBriefcase, FiMapPin, FiDollarSign, FiClock, FiFilter } from 'react-icons/fi';
+
+type Job = {
+  id: string;
+  title: string;
+  company: {
+    display_name: string;
+  };
+  location: {
+    display_name: string;
+  };
+  description: string;
+  created: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_currency?: string;
+  contract_time?: string;
+  category?: {
+    label: string;
+  };
+  redirect_url: string;
+};
 
 export default function JobSearchApp() {
   const [jobTitle, setJobTitle] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const jobsPerPage = 15; // Number of jobs to show per page
+  const jobsPerPage = 15;
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingCV, setLoadingCV] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<any | null>(null);
-  const [parsedCV, setParsedCV] = useState<any | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [parsedCV, setParsedCV] = useState<any>(null);
   const [jobScore, setJobScore] = useState<{ score: number; reason: string } | null>(null);
   const [isScoring, setIsScoring] = useState(false);
 
@@ -24,32 +45,29 @@ export default function JobSearchApp() {
     setLoadingJobs(true);
     setError(null);
     setSearched(true);
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(1);
 
     try {
       const response = await axios.get('/api/search-jobs', {
         params: { jobTitle },
       });
       setJobs(response.data.results || []);
-    } catch (_err) {
+    } catch (err) {
       setError('Failed to fetch jobs.');
     } finally {
       setLoadingJobs(false);
     }
   };
-  
-  // Get current jobs for the current page
+
   const indexOfLastJob = currentPage * jobsPerPage;
   const indexOfFirstJob = indexOfLastJob - jobsPerPage;
   const currentJobs = jobs.slice(indexOfFirstJob, indexOfLastJob);
   const totalPages = Math.ceil(jobs.length / jobsPerPage);
-  
-  // Change page
+
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-  
-  // Generate page numbers for pagination
+
   const pageNumbers = [];
-  const maxPageButtons = 5; // Maximum number of page buttons to show
+  const maxPageButtons = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
   let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
   
@@ -69,18 +87,19 @@ export default function JobSearchApp() {
 
     try {
       setIsScoring(true);
-      const job_score_response = await axios.post('/api/score-job', {
-        jobs:[job],
+      const response = await axios.post('/api/score-job', {
+        jobs: [job],
         cv: parsedCV,
       });
-
-      const parsed_score = typeof job_score_response.data === 'string' ? JSON.parse(job_score_response.data) : job_score_response.data;
-      const score_reason = typeof parsed_score.score === 'string' ? JSON.parse(parsed_score.score) : parsed_score.score;
+      
+      const parsedScore = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      const scoreReason = typeof parsedScore.score === 'string' ? JSON.parse(parsedScore.score) : parsedScore.score;
+      
       setJobScore({
-        score: score_reason.score,
-        reason: score_reason.reason
+        score: scoreReason.score,
+        reason: scoreReason.reason
       });
-    } catch (_err) {
+    } catch (err) {
       setError('Failed to score the selected job.');
     } finally {
       setIsScoring(false);
@@ -95,159 +114,283 @@ export default function JobSearchApp() {
     formData.append('file', file);
 
     try {
+      setLoadingCV(true);
       setError(null);
-
-      const response = await axios.post('/api/upload-resume', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const { cv_text } = response.data;
-      
-      setLoadingCV(true)
-
-      const parseResponse = await axios.post('/api/parse-cv', { cv_text });
-      const { parsed_cv} = parseResponse.data;
-      setParsedCV(parsed_cv);
-
-    } catch (_err) {
-      setError('Failed to upload resume or invoke processing.');
+      const response = await axios.post('/api/upload-resume', formData);
+      setParsedCV(response.data);
+    } catch (err) {
+      setError('Failed to upload and parse CV.');
     } finally {
-      // setLoadingCV(false);
+      setLoadingCV(false);
     }
   };
 
-  const getLabel = () => {
-    if (!loadingCV) return 'Upload CV';
-    if (loadingCV && parsedCV === null) return 'Parsing CV...';
-    if (parsedCV) return 'CV Uploaded';
-  };
-
   return (
-    <div className="min-h-screen bg-white text-gray-900 relative">
-      <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-center">Search Jobs in Germany</h1>
-        <div className="flex gap-2 mb-8 justify-center items-center">
-          <input
-            type="text"
-            className="border border-gray-300 rounded p-2 w-1/2"
-            placeholder="Enter job title"
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-          />
-          <button
-            onClick={handleSearch}
-            disabled={loadingJobs}
-            className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition"
-          >
-            {loadingJobs ? 'Searching...' : 'Search'}
-          </button>
-          
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={(e) => handleUpload(e)}
-            className="hidden"
-            id="resume-upload"
-          />
-          <label
-            htmlFor="resume-upload"
-            className="cursor-pointer bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition"
-          >
-            {getLabel()}
-
-          </label>
-        </div>
-
-        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
-
-        {!loadingJobs && searched && jobs.length === 0 && !error && (
-          <p className="text-center text-gray-500">No jobs found for "{jobTitle}".</p>
-        )}
-
-        {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {currentJobs.map((job: Job) => (
-            <div
-              key={job.id}
-              onClick={async () => {
-                setSelectedJob(job);
-                await scoreJob(job); 
-              }}
-
-              className="bg-gray-100 rounded p-4 shadow-md hover:shadow-lg transition cursor-pointer"
-            >
-              <h2 className="text-lg font-semibold mb-1">{job.title}</h2>
-              <p className="text-sm text-gray-600">{job.company.display_name}</p>
-              <p className="text-sm text-gray-500 mb-2">{job.location.display_name}</p>
-              <p className="text-sm mb-2">{job.description.slice(0, 150)}...</p>
-              <span className="text-blue-600 underline text-sm">Click to view more</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header with Search */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col py-6">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                JobFinder
+              </h1>
+              <div className="flex items-center space-x-4">
+                <button className="hidden md:flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
+                  <FiMapPin className="mr-2" />
+                  Location
+                </button>
+                <button 
+                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                  onClick={() => document.getElementById('cv-upload')?.click()}
+                >
+                  <FiUpload className="mr-2" />
+                  {parsedCV ? 'Update CV' : 'Upload CV'}
+                  <input
+                    id="cv-upload"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleUpload}
+                    className="hidden"
+                  />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-        
-        {/* Pagination */}
-        {jobs.length > jobsPerPage && (
-          <div className="flex justify-center mt-8 space-x-2">
-            <button
-              onClick={() => paginate(1)}
-              disabled={currentPage === 1}
-              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
-            >
-              «
-            </button>
-            <button
-              onClick={() => paginate(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
-            >
-              ‹
-            </button>
-            
-            {startPage > 1 && (
-              <span className="px-3 py-1">...</span>
-            )}
-            
-            {pageNumbers.map(number => (
-              <button
-                key={number}
-                onClick={() => paginate(number)}
-                className={`px-3 py-1 rounded-md ${
-                  currentPage === number 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {number}
+
+            {/* Search Bar */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiSearch className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Job title, keywords, or company"
+                className="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base shadow-sm"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <button
+                  onClick={handleSearch}
+                  disabled={loadingJobs || !jobTitle.trim()}
+                  className={`inline-flex items-center px-6 py-2.5 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
+                    loadingJobs || !jobTitle.trim()
+                      ? 'bg-blue-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                  }`}
+                >
+                  {loadingJobs ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <FiSearch className="mr-2" />
+                      Search Jobs
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Filters */}
+            <div className="mt-4 flex items-center space-x-3 overflow-x-auto pb-2 scrollbar-hide">
+              <button className="px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-full flex items-center whitespace-nowrap">
+                <FiFilter className="mr-1.5" />
+                Remote
               </button>
-            ))}
-            
-            {endPage < totalPages && (
-              <span className="px-3 py-1">...</span>
-            )}
-            
-            <button
-              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
-            >
-              ›
-            </button>
-            <button
-              onClick={() => paginate(totalPages)}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
-            >
-              »
-            </button>
-            
-            <div className="flex items-center ml-4 text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
+              <button className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full flex items-center whitespace-nowrap">
+                <FiBriefcase className="mr-1.5" />
+                Full-time
+              </button>
+              <button className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full flex items-center whitespace-nowrap">
+                <FiDollarSign className="mr-1.5" />
+                $50k+
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </header>
 
-      {/* AnimatePresence + Modal */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {!loadingJobs && searched && jobs.length === 0 && !error && (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs found</h3>
+            <p className="text-gray-500">We couldn't find any jobs matching "{jobTitle}". Try different keywords.</p>
+          </div>
+        )}
+
+        {/* Job Listings */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {loadingJobs ? (
+            // Loading skeleton
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-5">
+                  <div className="h-6 bg-gray-200 rounded w-3/4 mb-4 animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2 mb-3 animate-pulse"></div>
+                  <div className="h-3 bg-gray-100 rounded w-1/3 mb-4 animate-pulse"></div>
+                  <div className="h-4 bg-gray-100 rounded w-1/4 animate-pulse"></div>
+                </div>
+              </div>
+            ))
+          ) : (
+            currentJobs.map((job) => (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer"
+                onClick={async () => {
+                  setSelectedJob(job);
+                  setJobScore(null);
+                  await scoreJob(job);
+                }}
+              >
+                <div className="p-5">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
+                        {job.title}
+                      </h3>
+                      <p className="text-gray-600 mt-1">{job.company?.display_name || 'Company not specified'}</p>
+                    </div>
+                    {job.company?.display_name && (
+                      <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold flex-shrink-0 ml-3">
+                        {job.company.display_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {job.location?.display_name && (
+                      <div className="flex items-center text-sm text-gray-500">
+                        <FiMapPin className="mr-1.5 flex-shrink-0" />
+                        <span className="truncate">{job.location.display_name}</span>
+                      </div>
+                    )}
+
+                    {(job.salary_min || job.salary_max) && (
+                      <div className="flex items-center text-sm text-gray-500">
+                        <FiDollarSign className="mr-1.5 flex-shrink-0" />
+                        <span>
+                          {job.salary_min?.toLocaleString()}
+                          {job.salary_max && ` - ${job.salary_max.toLocaleString()}`}
+                          {' '}{job.salary_currency || 'EUR'}
+                        </span>
+                      </div>
+                    )}
+
+                    {job.contract_time && (
+                      <div className="flex items-center text-sm text-gray-500">
+                        <FiClock className="mr-1.5 flex-shrink-0" />
+                        <span className="capitalize">{job.contract_time.replace('_', ' ')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+                    <span className="text-xs text-gray-400">
+                      Posted {new Date(job.created).toLocaleDateString()}
+                    </span>
+                    <button 
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedJob(job);
+                        setJobScore(null);
+                        scoreJob(job);
+                      }}
+                    >
+                      View details
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
+
+        {/* Pagination */}
+        {jobs.length > 0 && (
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">
+              Showing <span className="font-medium">{indexOfFirstJob + 1}</span> to{' '}
+              <span className="font-medium">
+                {Math.min(indexOfLastJob, jobs.length)}
+              </span>{' '}
+              of <span className="font-medium">{jobs.length}</span> results
+            </p>
+            
+            <nav className="flex items-center space-x-1">
+              <button
+                onClick={() => paginate(1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="First page"
+              >
+                «
+              </button>
+              <button
+                onClick={() => paginate(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous page"
+              >
+                ‹
+              </button>
+
+              <div className="flex items-center space-x-1">
+                {pageNumbers.map((number) => (
+                  <button
+                    key={number}
+                    onClick={() => paginate(number)}
+                    className={`w-10 h-10 flex items-center justify-center rounded-lg border ${
+                      currentPage === number
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                    } transition-colors`}
+                    aria-current={currentPage === number ? 'page' : undefined}
+                  >
+                    {number}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next page"
+              >
+                ›
+              </button>
+              <button
+                onClick={() => paginate(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Last page"
+              >
+                »
+              </button>
+            </nav>
+          </div>
+        )}
+      </main>
+
+      {/* Job Details Modal */}
       <AnimatePresence>
         {selectedJob && (
           <motion.div
@@ -257,18 +400,19 @@ export default function JobSearchApp() {
             className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/30"
           >
             <motion.div
-              initial={{ scale: 0.8, y: 30 }}
+              initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="bg-white rounded-lg max-w-6xl w-full p-0 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] mx-4 my-8"
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] mx-4 overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Header with gradient */}
+              {/* Modal Header */}
               <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-2xl font-bold mb-1">{selectedJob.title}</h2>
-                    <p className="text-blue-100">{selectedJob.company.display_name}</p>
+                    <h2 className="text-2xl font-bold">{selectedJob.title}</h2>
+                    <p className="text-blue-100 mt-1">{selectedJob.company?.display_name}</p>
                   </div>
                   <button
                     onClick={() => setSelectedJob(null)}
@@ -277,51 +421,56 @@ export default function JobSearchApp() {
                     &times;
                   </button>
                 </div>
+                
                 <div className="mt-4 flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {selectedJob.location.display_name}
-                  </div>
-                  {selectedJob.salary_min && (
+                  {selectedJob.location?.display_name && (
                     <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {selectedJob.salary_min.toLocaleString()} {selectedJob.salary_currency || 'EUR'}
-                      {selectedJob.salary_max && ` - ${selectedJob.salary_max.toLocaleString()} ${selectedJob.salary_currency || 'EUR'}`}
+                      <FiMapPin className="mr-1.5" />
+                      {selectedJob.location.display_name}
                     </div>
                   )}
+                  
+                  {(selectedJob.salary_min || selectedJob.salary_max) && (
+                    <div className="flex items-center">
+                      <FiDollarSign className="mr-1.5" />
+                      {selectedJob.salary_min?.toLocaleString()}
+                      {selectedJob.salary_max && ` - ${selectedJob.salary_max.toLocaleString()}`}
+                      {' '}{selectedJob.salary_currency || 'EUR'}
+                    </div>
+                  )}
+                  
                   <a
                     href={selectedJob.redirect_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="ml-auto bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="ml-auto bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     Apply Now
                   </a>
                 </div>
               </div>
-              {/* Content area with scroll */}
-              <div className="flex flex-1 overflow-hidden flex-col md:flex-row h-[calc(100%-180px)]">
+
+              {/* Modal Content */}
+              <div className="flex flex-1 overflow-hidden">
                 {/* Left Side - Job Description */}
-                <div className="w-full md:w-2/3 p-4 md:p-6 overflow-y-auto">
+                <div className="flex-1 p-6 overflow-y-auto">
                   <div className="prose max-w-none">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Job Description</h3>
                     <div className="text-gray-700 whitespace-pre-line text-sm leading-relaxed">
                       {selectedJob.description}
                     </div>
                     
-                    {selectedJob.contract_time && (
+                    {(selectedJob.contract_time || selectedJob.category) && (
                       <div className="mt-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Job Details</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-500">Contract Type</p>
-                            <p className="font-medium">{selectedJob.contract_time}</p>
-                          </div>
+                          {selectedJob.contract_time && (
+                            <div>
+                              <p className="text-gray-500">Contract Type</p>
+                              <p className="font-medium capitalize">{selectedJob.contract_time.replace('_', ' ')}</p>
+                            </div>
+                          )}
                           {selectedJob.category && (
                             <div>
                               <p className="text-gray-500">Category</p>
@@ -341,56 +490,56 @@ export default function JobSearchApp() {
                 </div>
 
                 {/* Right Side - Match Score */}
-              <div className="w-full md:w-1/3 p-4 md:p-6 bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto overflow-x-hidden h-full">
-                <div className="w-full flex flex-col h-full">
-                  {isScoring ? (
-                    // Skeleton loading state
-                    <div className="w-full">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div>
-                        <div className="h-8 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-80 border-l border-gray-200 bg-gray-50 p-6 overflow-y-auto">
+                  <div className="flex flex-col h-full">
+                    {isScoring ? (
+                      // Skeleton loading state
+                      <div className="space-y-4">
+                        <div className="h-8 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 rounded w-4/6 animate-pulse"></div>
                       </div>
-                      <div className="space-y-2 w-full">
-                        <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
-                        <div className="h-24 bg-gray-100 rounded animate-pulse"></div>
+                    ) : jobScore ? (
+                      // Score display
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-gray-800">Your Match Score</h3>
+                          <span 
+                            className="text-white px-3 py-1 rounded-full text-sm font-bold shadow"
+                            style={{
+                              backgroundColor: `hsl(${jobScore.score * 1.2}, 70%, 45%)`,
+                            }}
+                          >
+                            {jobScore.score}/100
+                          </span>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <h4 className="font-medium text-gray-800 mb-2">Why this score?</h4>
+                          <p className="text-gray-600 text-sm">{jobScore.reason}</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : jobScore ? (
-                    // Actual score content
-                    <>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-lg font-semibold text-gray-800">Fit Score:</h3>
-                        <span
-                          className="text-white px-3 py-1 rounded-full text-sm font-bold shadow"
-                          style={{
-                            backgroundColor: `hsl(120, 70%, ${100 - jobScore.score / 2}%)`,
-                          }}
+                    ) : (
+                      // Empty state when no CV is uploaded
+                      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 p-4">
+                        <FiUpload className="w-8 h-8 mb-2 text-gray-400" />
+                        <p className="mb-4">Upload your CV to see your match score</p>
+                        <button
+                          onClick={() => document.getElementById('cv-upload')?.click()}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
-                          {jobScore.score}/100
-                        </span>
+                          <FiUpload className="mr-2" />
+                          Upload CV
+                        </button>
                       </div>
-                      <div className="bg-white p-4 border rounded text-sm text-gray-800 whitespace-pre-wrap w-full break-words">
-                        <strong>Why:</strong>
-                        <p className="mt-2">{jobScore.reason}</p>
-                      </div>
-                    </>
-                  ) : (
-                    // Empty state when no CV is uploaded
-                    <div className="text-center w-full text-gray-500 p-4 h-full flex items-center justify-center">
-                      <p>Upload your CV to see your match score</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <footer className="bg-gray-100 text-gray-600 text-center text-sm py-4 border-t mt-8">
-        Jobs are fetched from the Adzuna API. We do not take responsibility for any inaccurate or misleading information.
-      </footer>
     </div>
   );
 }
