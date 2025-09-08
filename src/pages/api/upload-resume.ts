@@ -34,7 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { bucket, key, url } = await uploadPdfToS3(buffer, fileName);
       console.log('Bucket', bucket, key, url);
 
-      // Setup request
       const apiUrl = 'https://ryqg4jgfxk.execute-api.eu-central-1.amazonaws.com/development-env';
       const parsedUrl = new URL(apiUrl);
 
