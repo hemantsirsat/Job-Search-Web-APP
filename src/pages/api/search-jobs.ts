@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { jobTitle } = req.query;
+  const { jobTitle, countryCode = 'de' } = req.query;
   const APP_ID = process.env.ADZUNA_APP_ID;
   const APP_KEY = process.env.ADZUNA_APP_KEY;
 
@@ -10,8 +10,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'API credentials not set' });
   }
 
+  // Validate country code
+  const validCountryCodes = ['de', 'us', 'gb', 'fr', 'es', 'it', 'nl', 'at', 'ch'];
+  const country = validCountryCodes.includes(countryCode as string) 
+    ? countryCode 
+    : 'de';
+
   try {
-    const response = await axios.get('https://api.adzuna.com/v1/api/jobs/de/search/1', {
+    const response = await axios.get(`https://api.adzuna.com/v1/api/jobs/${country}/search/1`, {
       params: {
         app_id: APP_ID,
         app_key: APP_KEY,

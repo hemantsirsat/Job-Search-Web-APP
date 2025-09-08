@@ -39,7 +39,41 @@ export default function JobSearchApp() {
   const [jobScore, setJobScore] = useState<{ score: number; reason: string } | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'parsing' | 'success'>('idle');
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState({
+    code: 'DE',
+    name: 'Germany',
+    flag: '🇩🇪'
+  });
+  
+  const countries = [
+    { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+    { code: 'US', name: 'United States', flag: '🇺🇸' },
+    { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+    { code: 'FR', name: 'France', flag: '🇫🇷' },
+    { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+    { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+    { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+    { code: 'AT', name: 'Austria', flag: '🇦🇹' },
+    { code: 'CH', name: 'Switzerland', flag: '🇨🇭' }
+  ];
+  
   const uploadStateRef = useRef(uploadState);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowCountryDropdown(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   // Keep the ref in sync with state
   useEffect(() => {
@@ -55,11 +89,15 @@ export default function JobSearchApp() {
 
     try {
       const response = await axios.get('/api/search-jobs', {
-        params: { jobTitle },
+        params: { 
+          jobTitle,
+          countryCode: selectedCountry.code.toLowerCase()
+        },
       });
       setJobs(response.data.results || []);
     } catch (err) {
-      setError('Failed to fetch jobs.');
+      console.error('Error fetching jobs:', err);
+      setError('Failed to fetch jobs. Please try again.');
     } finally {
       setLoadingJobs(false);
     }
@@ -202,10 +240,36 @@ export default function JobSearchApp() {
                 JobFinder
               </h1>
               <div className="flex items-center space-x-4">
-                <button className="hidden md:flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors">
-                  <FiMapPin className="mr-2" />
-                  Location
-                </button>
+                <div className="relative" ref={dropdownRef}>
+                  <button 
+                    className="hidden md:flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                  >
+                    <span className="mr-1.5">{selectedCountry.flag}</span>
+                    <span>{selectedCountry.code}</span>
+                    <svg className="ml-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {showCountryDropdown && (
+                    <div className="absolute z-50 mt-1 w-48 bg-white rounded-md shadow-lg py-1">
+                      {countries.map((country) => (
+                        <button
+                          key={country.code}
+                          className={`flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 ${selectedCountry.code === country.code ? 'bg-blue-50' : ''}`}
+                          onClick={() => {
+                            setSelectedCountry(country);
+                            setShowCountryDropdown(false);
+                          }}
+                        >
+                          <span className="mr-2">{country.flag}</span>
+                          <span>{country.name} ({country.code})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <motion.div 
                   className="relative"
                   whileHover={{ scale: 1.02 }}
@@ -366,12 +430,10 @@ export default function JobSearchApp() {
                   </div>
 
                   <div className="mt-4 space-y-2">
-                    {job.location?.display_name && (
-                      <div className="flex items-center text-sm text-gray-500">
-                        <FiMapPin className="mr-1.5 flex-shrink-0" />
-                        <span className="truncate">{job.location.display_name}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center text-sm text-gray-500">
+                      <FiMapPin className="mr-1.5 flex-shrink-0" />
+                        <span className="truncate">{job.location?.display_name || 'Location not specified'}</span>
+                    </div>
 
                     {(job.salary_min || job.salary_max) && (
                       <div className="flex items-center text-sm text-gray-500">
@@ -516,8 +578,8 @@ export default function JobSearchApp() {
                 <div className="mt-4 flex flex-wrap gap-4 text-sm">
                   {selectedJob.location?.display_name && (
                     <div className="flex items-center">
-                      <FiMapPin className="mr-1.5" />
-                      {selectedJob.location.display_name}
+                      <FiMapPin className="mr-1.5 flex-shrink-0" />
+                        <span className="truncate">{selectedJob.location.display_name}</span>
                     </div>
                   )}
                   
