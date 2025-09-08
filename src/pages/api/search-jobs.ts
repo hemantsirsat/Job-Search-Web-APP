@@ -16,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         app_id: APP_ID,
         app_key: APP_KEY,
         what: jobTitle,
-        results_per_page: 100,
-        max_days_old:1,
+        results_per_page: 1000,
+        max_days_old:7,
       },
     });
     res.status(200).json(response.data);

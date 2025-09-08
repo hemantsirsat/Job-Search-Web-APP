@@ -8,6 +8,8 @@ import { Job } from './types';
 export default function JobSearchApp() {
   const [jobTitle, setJobTitle] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const jobsPerPage = 15; // Number of jobs to show per page
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingCV, setLoadingCV] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +23,7 @@ export default function JobSearchApp() {
     setLoadingJobs(true);
     setError(null);
     setSearched(true);
+    setCurrentPage(1); // Reset to first page on new search
 
     try {
       const response = await axios.get('/api/search-jobs', {
@@ -33,6 +36,29 @@ export default function JobSearchApp() {
       setLoadingJobs(false);
     }
   };
+  
+  // Get current jobs for the current page
+  const indexOfLastJob = currentPage * jobsPerPage;
+  const indexOfFirstJob = indexOfLastJob - jobsPerPage;
+  const currentJobs = jobs.slice(indexOfFirstJob, indexOfLastJob);
+  const totalPages = Math.ceil(jobs.length / jobsPerPage);
+  
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  
+  // Generate page numbers for pagination
+  const pageNumbers = [];
+  const maxPageButtons = 5; // Maximum number of page buttons to show
+  let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+  let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+  
+  if (endPage - startPage + 1 < maxPageButtons) {
+    startPage = Math.max(1, endPage - maxPageButtons + 1);
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pageNumbers.push(i);
+  }
 
   const scoreJob = async (job: Job) => {
     if (!parsedCV) {
@@ -136,7 +162,7 @@ export default function JobSearchApp() {
 
         {/* Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {jobs.map((job: Job) => (
+          {currentJobs.map((job: Job) => (
             <div
               key={job.id}
               onClick={async () => {
@@ -154,6 +180,67 @@ export default function JobSearchApp() {
             </div>
           ))}
         </div>
+        
+        {/* Pagination */}
+        {jobs.length > jobsPerPage && (
+          <div className="flex justify-center mt-8 space-x-2">
+            <button
+              onClick={() => paginate(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
+            >
+              «
+            </button>
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
+            >
+              ‹
+            </button>
+            
+            {startPage > 1 && (
+              <span className="px-3 py-1">...</span>
+            )}
+            
+            {pageNumbers.map(number => (
+              <button
+                key={number}
+                onClick={() => paginate(number)}
+                className={`px-3 py-1 rounded-md ${
+                  currentPage === number 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+            
+            {endPage < totalPages && (
+              <span className="px-3 py-1">...</span>
+            )}
+            
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => paginate(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded-md bg-gray-200 text-gray-700 disabled:opacity-50"
+            >
+              »
+            </button>
+            
+            <div className="flex items-center ml-4 text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AnimatePresence + Modal */}
