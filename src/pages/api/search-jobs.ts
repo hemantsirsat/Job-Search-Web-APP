@@ -21,13 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
     res.status(200).json(response.data);
-  } catch (_error: unknown) {
-    if (_error.response) {
-      console.error('Adzuna API response error:', _error.response.data);
-      res.status(_error.response.status).json(_error.response.data);
-    } else {
-      console.error('Adzuna API error:', _error.message);
-      res.status(500).json({ _error: _error.message });
-    }
+  } catch {
+      console.error('Error fetching jobs.');
   }
 }
