@@ -17,6 +17,7 @@ export default function JobSearchApp() {
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [parsedCV, setParsedCV] = useState<any | null>(null);
   const [jobScore, setJobScore] = useState<{ score: number; reason: string } | null>(null);
+  const [isScoring, setIsScoring] = useState(false);
 
   const handleSearch = async () => {
     if (!jobTitle.trim()) return;
@@ -67,6 +68,7 @@ export default function JobSearchApp() {
     }
 
     try {
+      setIsScoring(true);
       const job_score_response = await axios.post('/api/score-job', {
         jobs:[job],
         cv: parsedCV,
@@ -80,6 +82,8 @@ export default function JobSearchApp() {
       });
     } catch (_err) {
       setError('Failed to score the selected job.');
+    } finally {
+      setIsScoring(false);
     }
   };
 
@@ -289,30 +293,47 @@ export default function JobSearchApp() {
               </div>
 
               {/* Right Side - Match Score */}
-              {jobScore && (
-                <div className="w-1/3">
-                  <div className="w-90 flex flex-col items-start">
-                    {/* Fit Score */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-800">Fit Score:</h3>
-                      <span
-                        className="text-white px-3 py-1 rounded-full text-sm font-bold shadow"
-                        style={{
-                          backgroundColor: `hsl(120, 70%, ${100 - jobScore.score / 2}%)`,
-                        }}
-                      >
-                        {jobScore.score}/100
-                      </span>
+              <div className="w-1/3 pl-6 border-l border-gray-200">
+                <div className="w-90 flex flex-col items-start">
+                  {isScoring ? (
+                    // Skeleton loading state
+                    <div className="w-full">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-8 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="space-y-2 w-full">
+                        <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-24 bg-gray-100 rounded animate-pulse"></div>
+                      </div>
                     </div>
-
-                    {/* Reason box */}
-                    <div className="bg-gray-50 p-4 border rounded text-sm text-gray-800 whitespace-pre-wrap w-full">
-                      <strong>Why:</strong>
-                      <p className="mt-2">{jobScore.reason}</p>
+                  ) : jobScore ? (
+                    // Actual score content
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-lg font-semibold text-gray-800">Fit Score:</h3>
+                        <span
+                          className="text-white px-3 py-1 rounded-full text-sm font-bold shadow"
+                          style={{
+                            backgroundColor: `hsl(120, 70%, ${100 - jobScore.score / 2}%)`,
+                          }}
+                        >
+                          {jobScore.score}/100
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-4 border rounded text-sm text-gray-800 whitespace-pre-wrap w-full">
+                        <strong>Why:</strong>
+                        <p className="mt-2">{jobScore.reason}</p>
+                      </div>
+                    </>
+                  ) : (
+                    // Empty state when no CV is uploaded
+                    <div className="text-center w-full text-gray-500 p-4">
+                      <p>Upload and parse your CV to see your match score</p>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </motion.div>
           </motion.div>
         )}
