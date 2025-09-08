@@ -329,7 +329,7 @@ export default function JobSearchApp() {
                   ) : (
                     // Empty state when no CV is uploaded
                     <div className="text-center w-full text-gray-500 p-4">
-                      <p>Upload and parse your CV to see your match score</p>
+                      <p>Upload your CV to see your match score</p>
                     </div>
                   )}
                 </div>
