@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         body: signedRequest.body,
       });
 
-      const lambdaData = await lambdaResponse.json();
+      const lambdaData = (await lambdaResponse.json()) as { body: unknown };
 
       const parsedBody =
         typeof lambdaData.body === 'string'
