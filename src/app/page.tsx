@@ -30,7 +30,8 @@ export default function JobSearchApp() {
   const [jobTitle, setJobTitle] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const jobsPerPage = 15;
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 15;
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -45,6 +46,7 @@ export default function JobSearchApp() {
     name: 'Germany',
     flag: '🇩🇪'
   });
+  
   
   const countries = [
     { code: 'DE', name: 'Germany', flag: '🇩🇪' },
@@ -80,21 +82,29 @@ export default function JobSearchApp() {
     uploadStateRef.current = uploadState;
   }, [uploadState]);
 
-  const handleSearch = async () => {
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+
+  const handleSearch = async (page: number = 1): Promise<void> => {
     if (!jobTitle.trim()) return;
+    
     setLoadingJobs(true);
     setError(null);
     setSearched(true);
-    setCurrentPage(1);
+    setCurrentPage(page);
 
     try {
       const response = await axios.get('/api/search-jobs', {
         params: { 
           jobTitle,
-          countryCode: selectedCountry.code.toLowerCase()
+          countryCode: selectedCountry.code.toLowerCase(),
+          page: page,
+          itemsPerPage: itemsPerPage,
         },
       });
+      
       setJobs(response.data.results || []);
+      setTotalItems(response.data.count || 0);
+      
     } catch (err) {
       console.error('Error fetching jobs:', err);
       setError('Failed to fetch jobs. Please try again.');
@@ -103,16 +113,21 @@ export default function JobSearchApp() {
     }
   };
 
-  const indexOfLastJob = currentPage * jobsPerPage;
-  const indexOfFirstJob = indexOfLastJob - jobsPerPage;
-  const currentJobs = jobs.slice(indexOfFirstJob, indexOfLastJob);
-  const totalPages = Math.ceil(jobs.length / jobsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const currentJobs = jobs;
 
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const handlePageChange = (newPage: number): void => {
+    if (newPage < 1 || newPage > totalPages) return;
+    handleSearch(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
+  // Generate page numbers for pagination
   const pageNumbers = [];
-  const maxPageButtons = 5;
-  let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+  const maxPageButtons = 10;
+  const halfMaxButtons = Math.floor(maxPageButtons / 2);
+  
+  let startPage = Math.max(1, currentPage - halfMaxButtons);
   let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
   
   if (endPage - startPage + 1 < maxPageButtons) {
@@ -327,7 +342,10 @@ export default function JobSearchApp() {
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                 <button
-                  onClick={handleSearch}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSearch();
+                  }}
                   disabled={loadingJobs || !jobTitle.trim()}
                   className={`inline-flex items-center px-6 py-2.5 rounded-lg text-white font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${
                     loadingJobs || !jobTitle.trim()
@@ -353,21 +371,7 @@ export default function JobSearchApp() {
               </div>
             </div>
 
-            {/* Quick Filters */}
-            <div className="mt-4 flex items-center space-x-3 overflow-x-auto pb-2 scrollbar-hide">
-              <button className="px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-full flex items-center whitespace-nowrap">
-                <FiFilter className="mr-1.5" />
-                Remote
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full flex items-center whitespace-nowrap">
-                <FiBriefcase className="mr-1.5" />
-                Full-time
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full flex items-center whitespace-nowrap">
-                <FiDollarSign className="mr-1.5" />
-                $50k+
-              </button>
-            </div>
+            {/* Quick Filters - Removed as per requirements */}
           </div>
         </div>
       </header>
@@ -480,16 +484,16 @@ export default function JobSearchApp() {
         {jobs.length > 0 && (
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-gray-500">
-              Showing <span className="font-medium">{indexOfFirstJob + 1}</span> to{' '}
+              Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(indexOfLastJob, jobs.length)}
+                {Math.min(currentPage * itemsPerPage, totalItems)}
               </span>{' '}
-              of <span className="font-medium">{jobs.length}</span> results
+              of <span className="font-medium">{totalItems}</span> results
             </p>
             
             <nav className="flex items-center space-x-1">
               <button
-                onClick={() => paginate(1)}
+                onClick={() => handlePageChange(1)}
                 disabled={currentPage === 1}
                 className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="First page"
@@ -497,7 +501,7 @@ export default function JobSearchApp() {
                 «
               </button>
               <button
-                onClick={() => paginate(Math.max(1, currentPage - 1))}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="Previous page"
@@ -509,7 +513,7 @@ export default function JobSearchApp() {
                 {pageNumbers.map((number) => (
                   <button
                     key={number}
-                    onClick={() => paginate(number)}
+                    onClick={() => handlePageChange(number)}
                     className={`w-10 h-10 flex items-center justify-center rounded-lg border ${
                       currentPage === number
                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
@@ -523,7 +527,7 @@ export default function JobSearchApp() {
               </div>
 
               <button
-                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="Next page"
@@ -531,7 +535,7 @@ export default function JobSearchApp() {
                 ›
               </button>
               <button
-                onClick={() => paginate(totalPages)}
+                onClick={() => handlePageChange(totalPages)}
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 aria-label="Last page"
