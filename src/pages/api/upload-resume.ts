@@ -17,11 +17,11 @@ export const config = {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const form = formidable({ keepExtensions: true });
 
-  form.parse(req, async (err, fields, files) => {
+  form.parse(req, async (err: any, fields: formidable.Fields, files: formidable.Files) => {
     if (err) return res.status(500).json({ error: 'Form parsing failed' });
-
+  
     const uploadedFile = Array.isArray(files.file) ? files.file[0] : (files.file as File | undefined);
-
+  
     if (!uploadedFile || !uploadedFile.filepath) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
