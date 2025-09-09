@@ -65,10 +65,15 @@ export default function FindJobPage() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const countryDropdownRef = useRef<HTMLDivElement>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node) &&
+          sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
         setShowCountryDropdown(false);
+        setShowSortDropdown(false);
       }
     };
     
@@ -275,10 +280,14 @@ export default function FindJobPage() {
               </form>
               
               <div className="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto">
-                <div className="relative w-full sm:w-auto" ref={dropdownRef}>
+                <div className="relative w-full sm:w-auto" ref={countryDropdownRef}>
                   <button 
                     className="flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-lg shadow-sm hover:shadow-md transition-all w-full sm:w-auto justify-between"
-                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCountryDropdown(!showCountryDropdown);
+                      setShowSortDropdown(false);
+                    }}
                   >
                     <div className="flex items-center">
                       <span className="mr-2 text-lg">{selectedCountry.flag}</span>
@@ -312,10 +321,14 @@ export default function FindJobPage() {
                   )}
                 </div>
 
-                <div className="relative w-full sm:w-auto" ref={dropdownRef}>
+                <div className="relative w-full sm:w-auto" ref={sortDropdownRef}>
                   <button 
                     className="flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-lg shadow-sm hover:shadow-md transition-all w-full sm:w-auto justify-between"
-                    onClick={() => setShowSortDropdown(!showSortDropdown)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSortDropdown(!showSortDropdown);
+                      setShowCountryDropdown(false);
+                    }}
                   >
                     <div className="flex items-center">
                       <FiFilter className="mr-2 h-4 w-4 text-gray-500" />
