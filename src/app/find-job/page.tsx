@@ -161,40 +161,44 @@ export default function FindJobPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const uploadStateRef = useRef(uploadState);
+  
+  // Keep the ref in sync with state
+  useEffect(() => {
+    uploadStateRef.current = uploadState;
+  }, [uploadState]);
+
   const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    setUploadState('uploading');
-    
+
+    const formData = new FormData();
+    formData.append('file', file);
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      setUploadState('uploading');
+      setError(null);
       
-      // Simulate upload and parsing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Simulate upload time
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setUploadState('parsing');
+      const response = await axios.post('/api/upload-resume', formData);
       
-      // Simulate parsing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate parsing time
+      await new Promise(resolve => setTimeout(resolve, 1200));
       
-      // Mock parsed CV data
-      setParsedCV({
-        skills: ['JavaScript', 'React', 'Node.js', 'TypeScript'],
-        experience: 5,
-        education: [
-          { degree: 'BSc Computer Science', year: 2018 },
-          { degree: 'MSc Software Engineering', year: 2020 }
-        ]
-      });
-      
+      setParsedCV(response.data);
       setUploadState('success');
       
-      // Reset upload state after 3 seconds
+      // After 5 seconds, switch to update state if still in success state
       const timer = setTimeout(() => {
-        setUploadState('idle');
-      }, 3000);
+        if (uploadStateRef.current === 'success') {
+          setUploadState('idle');
+        }
+      }, 5000);
       
+      // Clean up timer if component unmounts or upload happens again
       return () => clearTimeout(timer);
     } catch (err) {
       setError('Failed to upload and parse CV.');
