@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import formidable, { File as FormidableFile, IncomingForm } from 'formidable';
+import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { uploadPdfToS3 } from '@/lib/s3Upload';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
@@ -17,15 +17,15 @@ export const config = {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const form = formidable({ keepExtensions: true });
 
-  form.parse(req, async (err: any, fields: Record<string, any>, files: Record<string, FormidableFile | FormidableFile[]>) => {
+  form.parse(req, async (err, fields, files) => {
     if (err) return res.status(500).json({ error: 'Form parsing failed' });
-  
-    const uploadedFile = Array.isArray(files.file) ? files.file[0] : (files.file as FormidableFile | undefined);
-  
+
+    const uploadedFile = Array.isArray(files.file) ? files.file[0] : (files.file as File | undefined);
+
     if (!uploadedFile || !uploadedFile.filepath) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-  
+
     const buffer = fs.readFileSync(uploadedFile.filepath);
 
     try {
