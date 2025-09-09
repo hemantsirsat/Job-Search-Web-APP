@@ -1,6 +1,20 @@
-declare module 'formidable';
+import { IncomingForm } from 'formidable';
 
-// This declaration file tells TypeScript that the 'formidable' module exists
-// and can be imported without type checking. For better type safety, you should
-// install @types/formidable using:
-// npm install --save-dev @types/formidable
+declare module 'formidable' {
+  export interface File {
+    size: number;
+    filepath: string;
+    originalFilename: string | null;
+    newFilename: string | null;
+    mimetype: string | null;
+    mtime?: Date;
+  }
+
+  export interface Fields {
+    [key: string]: string | string[] | undefined;
+  }
+
+  export interface Files {
+    [key: string]: File | File[] | undefined;
+  }
+}
