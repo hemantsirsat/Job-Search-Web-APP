@@ -18,8 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { cv, jobs } = req.body;
-  console.log(cv)
-  console.log(jobs)
+
   if (!cv) {
     return res.status(400).json({ error: 'parsed cv is required' });
   }
@@ -28,9 +27,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const apiUrl = 'https://aydopiql03.execute-api.eu-central-1.amazonaws.com/development-env';
     const parsedUrl = new URL(apiUrl);
 
-    const credentials = defaultProvider();
     const signer = new SignatureV4({
-      credentials,
+      credentials: defaultProvider(),
       region: 'eu-central-1',
       service: 'execute-api',
       sha256: Sha256,
@@ -61,11 +59,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       typeof lambdaData.body === 'string'
         ? JSON.parse(lambdaData.body)
         : lambdaData.body;
-
-    return res.status(200).json({
+        
+    const responseData = {
       message: 'Job scored based on CV',
       score: parsedBody.jobs[0].score,
-    });
+    };
+    return res.status(200).json(responseData);
   } catch (error: unknown) {
     console.error('Lambda call failed:', error);
     return res.status(500).json({ error: 'Lambda call failed' });

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiSearch, FiBriefcase, FiMapPin, FiDollarSign, FiClock, FiArrowRight, FiFilter, FiCalendar, FiCheckCircle, FiChevronDown, FiUpload } from 'react-icons/fi';
+import { FiSearch, FiBriefcase, FiMapPin, FiDollarSign, FiClock, FiArrowRight, FiFilter, FiCalendar, FiCheckCircle, FiChevronDown, FiUpload, FiTag, FiX } from 'react-icons/fi';
 
 type Job = {
   id: string;
@@ -38,7 +38,7 @@ export default function FindJobPage() {
   const [searched, setSearched] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [parsedCV, setParsedCV] = useState<any>(null);
-  const [jobScore, setJobScore] = useState<{ score: number; reason: string } | null>(null);
+  const [jobScore, setJobScore] = useState<{ overall_score: number; skills_score: number; experience_score: number; education_score: number; industry_score: number; satisfied_reason: Array<string>;  unsatisfied_reason: Array<string>;} | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'parsing' | 'success'>('idle');
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -94,7 +94,7 @@ export default function FindJobPage() {
           sort_by: sortBy
         }
       });
-      console.log(response.data);
+    //   console.log(response.data);
       setJobs(response.data.results || []);
       setTotalItems(response.data.count || 0);
       setTotalJobs(response.data.count || 0);
@@ -111,6 +111,49 @@ export default function FindJobPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     searchJobs(1);
+  };
+
+  const scoreJob = async (job: Job) => {
+    if (!parsedCV) {
+      setError('Please upload and parse your CV first.');
+      return;
+    }
+  
+    try {
+      setIsScoring(true);
+  
+      const response = await axios.post('/api/score-job', {
+        jobs: [job],
+        cv: parsedCV,
+      });
+      
+      const parsedScore = JSON.parse(response.data.score);
+      
+      const scores = parsedScore.score;
+      const reason = parsedScore.reason;
+      
+      setJobScore({
+        skills_score: scores.skills,
+        experience_score: scores.experience,
+        education_score: scores.education,
+        industry_score: scores.industry,
+        overall_score: scores.overall,
+        satisfied_reason: reason.satisfied,
+        unsatisfied_reason: reason.missing,
+      });
+      
+    } catch (err) {
+      setError('Failed to score the selected job.');
+    } finally {
+      setIsScoring(false);
+    }
+  };  
+
+  const handleJobSelect = async (job: Job) => {
+    setSelectedJob(job);
+    if (parsedCV) {
+      await scoreJob(job);
+    }
   };
 
   const handlePageChange = (page: number) => {
@@ -421,11 +464,12 @@ export default function FindJobPage() {
             {jobs.map((job, index) => (
               <motion.div
                 key={job.id}
+                onClick={() => handleJobSelect(job)}
+                className="cursor-pointer group bg-white overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-blue-100"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
-                className="group bg-white overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-blue-100"
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between">
@@ -596,79 +640,334 @@ export default function FindJobPage() {
       <AnimatePresence>
         {selectedJob && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-              </div>
-              
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <div 
+                className="fixed inset-0 bg-black/30 transition-opacity" 
+                onClick={() => setSelectedJob(null)}
+                aria-hidden="true"
+              />
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.2 }}
-                className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full sm:p-6"
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ 
+                  type: 'spring',
+                  damping: 25,
+                  stiffness: 300
+                }}
+                className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
               >
-                <div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h3>
-                      <p className="mt-1 text-lg text-gray-600">{selectedJob.company.display_name}</p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        <FiMapPin className="inline mr-1" />
-                        {selectedJob.location.display_name}
-                      </p>
-                      
-                      {(selectedJob.salary_min || selectedJob.salary_max) && (
-                        <p className="mt-2 text-sm text-gray-700">
-                          <FiDollarSign className="inline mr-1" />
-                          {selectedJob.salary_min && selectedJob.salary_max
-                            ? `${selectedJob.salary_currency || ''} ${selectedJob.salary_min.toLocaleString()} - ${selectedJob.salary_max.toLocaleString()} per year`
-                            : selectedJob.salary_min
-                            ? `From ${selectedJob.salary_currency || ''} ${selectedJob.salary_min.toLocaleString()}`
-                            : `Up to ${selectedJob.salary_currency || ''} ${selectedJob.salary_max?.toLocaleString()}`}
-                        </p>
-                      )}
-                      
-                      {selectedJob.contract_time && (
-                        <p className="mt-1 text-sm text-gray-700">
-                          <FiClock className="inline mr-1" />
-                          {selectedJob.contract_time.charAt(0).toUpperCase() + selectedJob.contract_time.slice(1)}
-                        </p>
-                      )}
+                {/* Fixed Header */}
+                <div className="px-6 py-4 bg-gradient-to-r from-blue-700 to-blue-600 text-white flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="pr-4">
+                      <h2 className="text-xl font-bold text-white line-clamp-1">{selectedJob.title}</h2>
+                      <div className="mt-1 flex flex-wrap items-center text-sm text-blue-100">
+                        <span className="mr-4 flex items-center">
+                          <FiBriefcase className="mr-1 h-4 w-4 flex-shrink-0" />
+                          <span className="truncate max-w-xs">{selectedJob.company.display_name}</span>
+                        </span>
+                        <span className="flex items-center">
+                          <FiMapPin className="mr-1 h-4 w-4 flex-shrink-0" />
+                          <span className="truncate max-w-xs">{selectedJob.location.display_name}</span>
+                        </span>
+                      </div>
                     </div>
-                    
                     <button
-                      type="button"
                       onClick={() => setSelectedJob(null)}
-                      className="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
+                      className="text-white hover:text-blue-100 transition-colors"
                     >
-                      <span className="sr-only">Close</span>
-                      <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <FiX className="h-6 w-6" />
                     </button>
                   </div>
-                  
-                  <div className="mt-6">
-                    <h4 className="text-lg font-medium text-gray-900">Job Description</h4>
+                </div>
+
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* Salary Information */}
+                  {(selectedJob.salary_min || selectedJob.salary_max) && (
+                    <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                      <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <FiDollarSign className="mr-2 h-4 w-4 text-blue-600" />
+                        Salary
+                      </h3>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {selectedJob.salary_min && selectedJob.salary_max
+                          ? `${selectedJob.salary_currency || ''} ${selectedJob.salary_min.toLocaleString()} - ${selectedJob.salary_max.toLocaleString()} per year`
+                          : selectedJob.salary_min
+                          ? `From ${selectedJob.salary_currency || ''} ${selectedJob.salary_min.toLocaleString()}`
+                          : `Up to ${selectedJob.salary_currency || ''} ${selectedJob.salary_max?.toLocaleString()}`}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Job Description */}
+                  <div className="prose prose-blue max-w-none mb-8">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Job Description</h3>
                     <div 
-                      className="mt-2 prose prose-sm max-w-none text-gray-500"
-                      dangerouslySetInnerHTML={{ __html: selectedJob.description || 'No description available.' }}
+                      className="text-gray-700 leading-relaxed"
+                      dangerouslySetInnerHTML={{ 
+                        __html: selectedJob.description || 'No description available.'
+                      }} 
                     />
                   </div>
-                  
-                  <div className="mt-6 flex justify-end">
-                    <a
-                      href={selectedJob.redirect_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Apply on Company Site
-                    </a>
+
+                  {/* Job Details */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 h-6 w-6 text-blue-600">
+                          <FiCalendar className="h-5 w-5" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">Date Posted</p>
+                          <p className="text-sm text-gray-900">
+                            {new Date(selectedJob.created).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedJob.contract_time && (
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 h-6 w-6 text-blue-600">
+                            <FiClock className="h-5 w-5" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Job Type</p>
+                            <p className="text-sm text-gray-900">
+                              {selectedJob.contract_time.charAt(0).toUpperCase() + selectedJob.contract_time.slice(1)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 h-6 w-6 text-blue-600">
+                          <FiMapPin className="h-5 w-5" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">Location</p>
+                          <p className="text-sm text-gray-900">
+                            {selectedJob.location.display_name}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedJob.category?.label && (
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 h-6 w-6 text-blue-600">
+                            <FiTag className="h-5 w-5" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-500">Category</p>
+                            <p className="text-sm text-gray-900">
+                              {selectedJob.category.label}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* CV Matching Section */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <FiCheckCircle className="mr-2 h-5 w-5 text-blue-600" />
+                      CV Match Score
+                    </h3>
+                    
+                    {isScoring ? (
+                      <div className="space-y-4">
+                        {/* Skeleton Loading State */}
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i}>
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse"></div>
+                              <div className="h-4 bg-gray-200 rounded w-10 animate-pulse"></div>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div 
+                                className="bg-gray-300 h-2.5 rounded-full animate-pulse" 
+                                style={{ width: '100%' }}
+                              ></div>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="mt-6 p-4 bg-white rounded-lg border border-blue-100">
+                          <div className="h-4 bg-gray-200 rounded w-1/3 mb-3 animate-pulse"></div>
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="flex items-start">
+                                <div className="h-4 w-4 bg-gray-200 rounded-full mt-1 mr-2 animate-pulse"></div>
+                                <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : jobScore ? (
+                      <div className="space-y-4">
+                        {/* Overall Match Score */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-700">Overall Match</span>
+                            <span className="text-sm font-semibold text-blue-700">
+                              {Math.round(jobScore.overall_score)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${
+                                jobScore.overall_score >= 0.7 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
+                                jobScore.overall_score >= 0.4 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                                'bg-gradient-to-r from-red-400 to-red-500'
+                              }`}
+                              style={{ width: `${jobScore.overall_score}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Skills Match */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-700">Skills Match</span>
+                            <span className="text-sm font-semibold text-blue-700">
+                              {Math.round(jobScore.skills_score)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${
+                                jobScore.skills_score >= 0.7 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
+                                jobScore.skills_score >= 0.4 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                                'bg-gradient-to-r from-red-400 to-red-500'
+                              }`}
+                              style={{ width: `${jobScore.skills_score}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Experience Level */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-700">Experience</span>
+                            <span className="text-sm font-semibold text-blue-700">
+                              {Math.round(jobScore.experience_score)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${
+                                jobScore.experience_score >= 0.7 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
+                                jobScore.experience_score >= 0.4 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                                'bg-gradient-to-r from-red-400 to-red-500'
+                              }`}
+                              style={{ width: `${jobScore.experience_score}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Education */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-700">Education</span>
+                            <span className="text-sm font-semibold text-blue-700">
+                              {Math.round(jobScore.education_score)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${
+                                jobScore.education_score >= 0.7 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
+                                jobScore.education_score >= 0.4 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                                'bg-gradient-to-r from-red-400 to-red-500'
+                              }`}
+                              style={{ width: `${jobScore.education_score}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      
+                        <div className="space-y-6 mt-6">
+                          {jobScore.satisfied_reason?.length > 0 && (
+                            <div className="p-4 bg-white rounded-lg border border-green-50 bg-green-50/30">
+                              <h4 className="text-sm font-medium text-green-800 mb-2 flex items-center">
+                                <FiCheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                                Your Strengths
+                              </h4>
+                              <ul className="text-sm text-gray-700 space-y-1.5">
+                                {jobScore.satisfied_reason.map((reason, index) => (
+                                  <li key={`satisfied-${index}`} className="flex items-start">
+                                    <span className="text-green-500 mr-2">•</span>
+                                    <span>{reason}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {jobScore.unsatisfied_reason?.length > 0 && (
+                            <div className="p-4 bg-white rounded-lg border border-amber-50 bg-amber-50/30">
+                              <h4 className="text-sm font-medium text-amber-800 mb-2 flex items-center">
+                                <FiCheckCircle className="h-4 w-4 text-amber-500 mr-2" />
+                                Areas for Improvement
+                              </h4>
+                              <ul className="text-sm text-gray-700 space-y-1.5">
+                                {jobScore.unsatisfied_reason.map((reason, index) => (
+                                  <li key={`unsatisfied-${index}`} className="flex items-start">
+                                    <span className="text-amber-500 mr-2">•</span>
+                                    <span>{reason}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-3">
+                          <FiUpload className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <h4 className="text-sm font-medium text-gray-900 mb-1">Upload Your CV to See Match Score</h4>
+                        <p className="text-sm text-gray-500 mb-4">Get personalized insights on how well your CV matches this job.</p>
+                        <label className="cursor-pointer inline-block">
+                          <div className="flex items-center justify-center px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg hover:from-blue-700 hover:to-blue-600 transition-all">
+                            {getUploadButtonContent()}
+                          </div>
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept=".pdf,.doc,.docx"
+                            onChange={handleCVUpload}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Fixed Footer */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end space-x-3 flex-shrink-0">
+                  <button
+                    onClick={() => setSelectedJob(null)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <a
+                    href={selectedJob.redirect_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    Apply Now <FiArrowRight className="inline ml-1 h-4 w-4" />
+                  </a>
                 </div>
               </motion.div>
             </div>
