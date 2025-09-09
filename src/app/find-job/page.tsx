@@ -814,6 +814,17 @@ export default function FindJobPage() {
                             ))}
                           </div>
                         </div>
+                        <div className="mt-6 p-4 bg-white rounded-lg border border-blue-100">
+                          <div className="h-4 bg-gray-200 rounded w-1/3 mb-3 animate-pulse"></div>
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="flex items-start">
+                                <div className="h-4 w-4 bg-gray-200 rounded-full mt-1 mr-2 animate-pulse"></div>
+                                <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : jobScore ? (
                       <div className="space-y-4">
