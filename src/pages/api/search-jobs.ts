@@ -11,7 +11,7 @@ interface AdzunaSearchParams {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { jobTitle, countryCode = 'de', page = 1, jobPerPage = 15 } = req.query;
+  const { jobTitle, country = 'de', page = 1, jobPerPage = 15, sort_by = 'relevance' } = req.query;
   const APP_ID = process.env.ADZUNA_APP_ID;
   const APP_KEY = process.env.ADZUNA_APP_KEY;
 
@@ -21,8 +21,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Validate country code
   const validCountryCodes = ['de', 'us', 'gb', 'fr', 'es', 'it', 'nl', 'at', 'ch'];
-  const country = validCountryCodes.includes(countryCode as string) 
-    ? countryCode 
+  const countryCode = validCountryCodes.includes(country as string) 
+    ? country
     : 'de';
 
   try {
@@ -35,12 +35,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       what: jobTitle as string,
       results_per_page: resultsPerPage,
       max_days_old: 7,
-      sort_by: 'date',
+      sort_by: sort_by as string,
     };
 
 
     // First, get the total count
-    const countResponse = await axios.get(`https://api.adzuna.com/v1/api/jobs/${country}/search/${page}`, {
+    const countResponse = await axios.get(`https://api.adzuna.com/v1/api/jobs/${countryCode}/search/${page}`, {
       params: {
         ...params,
         results_per_page: 1 // Just need the count
