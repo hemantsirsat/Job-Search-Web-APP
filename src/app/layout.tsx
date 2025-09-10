@@ -4,6 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from 'next-auth/react';
 import Navbar from '@/components/Navbar';
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,6 +32,8 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-grow pt-0">
               {children}
+              <Analytics />
+              <SpeedInsights />
             </main>
           </div>
         </SessionProvider>
